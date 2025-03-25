@@ -1,0 +1,289 @@
+<template>
+  <div class="settings-container">
+    <h2>Board Settings</h2>
+
+    <div class="settings-section">
+      <h3>Column Management</h3>
+
+      <draggable
+        v-model="localColumns"
+        group="columns-settings"
+        handle=".drag-handle"
+        item-key="id"
+        :animation="200"
+        class="columns-list"
+        @change="updateColumns"
+      >
+        <template #item="{ element }">
+          <div class="column-item">
+            <div class="column-info">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="column-name">{{ element.name }}</span>
+            </div>
+            <div class="column-actions">
+              <button @click="editColumn(element.id)">✏️ Edit</button>
+              <button @click="deleteColumn(element.id)" class="delete-btn">
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+        </template>
+      </draggable>
+
+      <div class="add-column">
+        <input
+          type="text"
+          v-model="newColumnName"
+          placeholder="New column name"
+          @keyup.enter="addNewColumn"
+        />
+        <button @click="addNewColumn" :disabled="!newColumnName.trim()">
+          + Add Column
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-footer">
+      <button @click="$emit('close')" class="back-btn">Back to Board</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import draggable from "vuedraggable";
+
+export default {
+  components: {
+    draggable,
+  },
+  props: {
+    columns: {
+      type: Array,
+      required: true,
+    },
+    todos: {
+      type: Object,
+      required: true,
+    },
+  },
+  emits: ["update-columns", "update-todos", "close"],
+  data() {
+    return {
+      newColumnName: "",
+    };
+  },
+  computed: {
+    localColumns: {
+      get() {
+        return this.columns;
+      },
+      set(value) {
+        this.$emit(
+          "update-columns",
+          value.map((col, idx) => ({
+            ...col,
+            order: idx,
+          }))
+        );
+      },
+    },
+  },
+  methods: {
+    updateColumns() {
+      // The localColumns setter handles the update
+    },
+
+    addNewColumn() {
+      if (!this.newColumnName.trim()) return;
+
+      const newColumn = {
+        id: `column-${Date.now().toString(36)}`,
+        name: this.newColumnName.trim(),
+        order: this.columns.length,
+      };
+
+      const updatedColumns = [...this.columns, newColumn];
+      this.$emit("update-columns", updatedColumns);
+
+      // Initialize empty todos array for the new column
+      const updatedTodos = { ...this.todos, [newColumn.id]: [] };
+      this.$emit("update-todos", updatedTodos);
+
+      // Reset input
+      this.newColumnName = "";
+    },
+
+    editColumn(columnId) {
+      const column = this.columns.find((col) => col.id === columnId);
+      if (column) {
+        const newName = prompt("Enter new column name:", column.name);
+        if (newName !== null && newName.trim()) {
+          const updatedColumns = this.columns.map((col) =>
+            col.id === columnId ? { ...col, name: newName.trim() } : col
+          );
+          this.$emit("update-columns", updatedColumns);
+        }
+      }
+    },
+
+    deleteColumn(columnId) {
+      if (
+        confirm(
+          "Are you sure you want to delete this column? All tasks in this column will be deleted."
+        )
+      ) {
+        const updatedColumns = this.columns
+          .filter((col) => col.id !== columnId)
+          .map((col, idx) => ({ ...col, order: idx }));
+
+        const updatedTodos = { ...this.todos };
+        delete updatedTodos[columnId];
+
+        this.$emit("update-columns", updatedColumns);
+        this.$emit("update-todos", updatedTodos);
+      }
+    },
+  },
+};
+</script>
+
+<style lang="scss" scoped>
+@use "../assets/variables" as *;
+@use "sass:color";
+
+.settings-container {
+  max-width: 800px;
+  max-height: 80vh; // Set maximum height to 80% of viewport height
+  overflow-y: auto; // Enable vertical scrolling when content overflows
+  margin: 0 auto;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: $shadow-medium;
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: $text-dark;
+  border-bottom: 1px solid $border-color;
+  padding-bottom: 10px;
+}
+
+.settings-section {
+  margin-bottom: 30px;
+
+  h3 {
+    margin-bottom: 15px;
+    color: $text-color;
+  }
+}
+
+.columns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.column-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: $light-grey;
+  border-radius: 5px;
+  box-shadow: $shadow-light;
+  &:hover {
+    background-color: color.adjust($light-grey, $lightness: -3%);
+  }
+}
+
+.column-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .drag-handle {
+    cursor: grab;
+    color: #888;
+    font-size: 16px;
+
+    &:active {
+      cursor: grabbing;
+    }
+
+    &:hover {
+      color: $text-dark;
+    }
+  }
+
+  .column-name {
+    font-weight: bold;
+    color: $text-dark;
+  }
+}
+
+.column-actions {
+  display: flex;
+  gap: 10px;
+
+  button {
+    padding: 6px 12px;
+    font-size: 13px;
+    background-color: white;
+    color: $text-color;
+    border: 1px solid $border-color;
+
+    &.delete-btn {
+      color: $danger-color;
+
+      &:hover {
+        background-color: $danger-color;
+        color: white;
+      }
+    }
+  }
+}
+
+.add-column {
+  display: flex;
+  margin-top: 15px;
+  gap: 10px;
+
+  input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+
+    &:focus {
+      outline: none;
+      border-color: $secondary-color;
+    }
+  }
+
+  button {
+    background-color: $secondary-color;
+    color: white;
+    width: 200px;
+
+    &:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.settings-footer {
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-end;
+
+  .back-btn {
+    background-color: $info-color;
+
+    &:hover {
+      background-color: $info-hover;
+    }
+  }
+}
+</style>

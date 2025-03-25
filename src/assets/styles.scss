@@ -1,0 +1,386 @@
+@use "variables" as *;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Arial", sans-serif;
+  background-color: #f4f6f8;
+  padding: 30px;
+  line-height: 1.5;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+
+  h1 {
+    color: $text-dark;
+    font-size: 28px;
+  }
+}
+
+button {
+  background-color: $primary-color;
+  color: white;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s, transform 0.1s;
+
+  &:hover {
+    background-color: $primary-hover;
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+#kanban-board {
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+  padding-bottom: 30px;
+  min-height: calc(100vh - 170px);
+  height: calc(100vh - 170px);
+
+  & > * {
+    display: flex;
+    flex-direction: row;
+    gap: 30px;
+  }
+}
+
+.column {
+  background-color: $light-grey;
+  border-radius: 12px;
+  width: 320px;
+  min-width: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-shadow: $shadow-medium;
+
+  &-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px 0 20px;
+    padding: 10px;
+    border-bottom: 2px solid $border-color;
+    flex-shrink: 0;
+    cursor: grab;
+  }
+
+  &-title {
+    margin: 0;
+    padding: 0;
+    font-size: 18px;
+    color: $text-color;
+  }
+
+  &-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  &-action-btn {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 16px;
+    transition: color 0.2s;
+
+    &:hover {
+      color: #000;
+      background: none;
+      transform: scale(1.2);
+    }
+  }
+}
+
+.task-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 5px;
+  max-height: calc(100% - 80px);
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f0f0f0;
+  min-height: 200px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: #c1c1c1;
+    border-radius: 4px;
+  }
+}
+
+.task {
+  background-color: white;
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: $shadow-light;
+  cursor: grab;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+  touch-action: none;
+  user-select: none;
+
+  &:hover {
+    box-shadow: $shadow-medium;
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &.dragging {
+    opacity: 0.5 !important;
+    background-color: #f8f9fa !important;
+    transform: rotate(2deg) !important;
+    box-shadow: $shadow-heavy !important;
+  }
+
+  &-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  &-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: $text-dark;
+  }
+
+  &-actions {
+    display: flex;
+    gap: 8px;
+
+    button {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      padding: 5px;
+      font-size: 16px;
+      transition: color 0.2s;
+
+      &:hover {
+        color: #000;
+        background: none;
+        transform: scale(1.2);
+      }
+    }
+  }
+
+  &-checklist {
+    margin-top: 15px;
+    padding-top: 12px;
+  }
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 5px 0;
+
+  input[type="checkbox"] {
+    margin-right: 12px;
+    transform: scale(1.2);
+    cursor: pointer;
+  }
+}
+
+/* Modal styles */
+.modal {
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  &-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 12px;
+    width: 75%;
+    max-width: 800px;
+    box-shadow: $shadow-heavy;
+  }
+}
+
+.close {
+  float: right;
+  font-size: 30px;
+  font-weight: bold;
+  cursor: pointer;
+  color: $text-light;
+  transition: color 0.2s;
+
+  &:hover {
+    color: $text-dark;
+  }
+}
+
+.form-group {
+  margin-bottom: 22px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: $text-color;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid $border-color;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+
+  &:focus {
+    border-color: $primary-color;
+    outline: none;
+  }
+}
+
+.checklist-item-container {
+  display: flex;
+  margin-bottom: 12px;
+  align-items: center;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #f9f9f9;
+  }
+
+  input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.2);
+  }
+
+  input[type="text"] {
+    flex-grow: 1;
+  }
+
+  button {
+    background-color: $danger-color;
+    margin-left: 12px;
+    padding: 8px 12px;
+    font-size: 16px;
+
+    &:hover {
+      background-color: $danger-hover;
+    }
+  }
+}
+
+#addChecklistItemBtn {
+  background-color: $info-color;
+  margin-top: 10px;
+
+  &:hover {
+    background-color: $info-hover;
+  }
+}
+
+#saveBtn {
+  padding: 12px 24px;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+.add-column-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 200px;
+  height: 100px;
+  margin: auto;
+  padding: 20px;
+
+  button {
+    background-color: $secondary-color;
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s, transform 0.1s;
+
+    &:hover {
+      background-color: $secondary-hover;
+      transform: translateY(-2px);
+    }
+  }
+}
+
+.ck-editor__editable {
+  min-height: 200px;
+}
+
+/* Make the app responsive */
+@media (max-width: 768px) {
+  body {
+    padding: 15px;
+  }
+
+  #kanban-board {
+    flex-direction: column;
+    align-items: center;
+    height: auto;
+  }
+
+  .column {
+    width: 100%;
+    margin-bottom: 20px;
+    height: 500px;
+  }
+
+  .modal-content {
+    width: 90%;
+    padding: 20px;
+  }
+}
