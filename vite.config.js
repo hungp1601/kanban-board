@@ -3,8 +3,8 @@ import vue from "@vitejs/plugin-vue";
 import path from "path";
 
 export default defineConfig({
+  base: "./", // Add this line to use relative paths for assets
   plugins: [vue()],
-  base: "/kanban-board/", // Add this line for GitHub Pages deployment
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
