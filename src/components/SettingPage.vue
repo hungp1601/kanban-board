@@ -17,7 +17,9 @@
         <template #item="{ element }">
           <div class="column-item">
             <div class="column-info">
-              <span class="drag-handle">⋮⋮</span>
+              <span class="drag-handle"
+                ><i class="fas fa-grip-vertical"></i
+              ></span>
               <span class="column-name">{{ element.name }}</span>
             </div>
             <div class="column-actions">
