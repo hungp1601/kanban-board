@@ -1,6 +1,16 @@
 <template>
   <main id="kanban-board">
-    <div class="kanban-columns-container">
+    <div
+      class="kanban-columns-container"
+      ref="columnContainer"
+      @mousedown="startDrag"
+      @mousemove="onDrag"
+      @mouseup="stopDrag"
+      @mouseleave="stopDrag"
+      @touchstart="startTouchDrag"
+      @touchmove="onTouchDrag"
+      @touchend="stopDrag"
+    >
       <KanbanColumn
         v-for="column in columns"
         :key="column.id"
@@ -44,6 +54,14 @@ export default {
     },
   },
   emits: ["update-todos", "edit-todo", "delete-todo", "update-checklist-item"],
+  data() {
+    return {
+      isDragging: false,
+      startX: 0,
+      scrollLeft: 0,
+      isScrolling: false,
+    };
+  },
   methods: {
     moveTodo(fromColumnId, toColumnId, todoId) {
       console.log(
@@ -103,6 +121,67 @@ export default {
 
       this.$emit("update-todos", updatedTodos);
     },
+
+    startDrag(e) {
+      // Only start dragging if we're not interacting with a child element
+      if (e.target.closest(".column-content, .todo-item, button")) {
+        return;
+      }
+
+      const container = this.$refs.columnContainer;
+      this.isDragging = true;
+      this.startX = e.pageX - container.offsetLeft;
+      this.scrollLeft = container.scrollLeft;
+      container.style.cursor = "grabbing";
+      container.style.userSelect = "none";
+      e.preventDefault();
+    },
+
+    onDrag(e) {
+      if (!this.isDragging) return;
+
+      const container = this.$refs.columnContainer;
+      const x = e.pageX - container.offsetLeft;
+      const walk = (x - this.startX) * 3; // Increased from 1.5 to 3 for faster scrolling
+      container.scrollLeft = this.scrollLeft - walk;
+      this.isScrolling = true;
+    },
+
+    stopDrag() {
+      const container = this.$refs.columnContainer;
+      this.isDragging = false;
+      container.style.cursor = "grab";
+      container.style.removeProperty("user-select");
+
+      // Prevent click events immediately after scrolling
+      setTimeout(() => {
+        this.isScrolling = false;
+      }, 100);
+    },
+
+    startTouchDrag(e) {
+      if (e.target.closest(".column-content, .todo-item, button")) {
+        return;
+      }
+
+      const container = this.$refs.columnContainer;
+      this.isDragging = true;
+      this.startX = e.touches[0].pageX - container.offsetLeft;
+      this.scrollLeft = container.scrollLeft;
+      // Prevent default to avoid browser handling the touch event
+      e.preventDefault();
+    },
+
+    onTouchDrag(e) {
+      if (!this.isDragging) return;
+
+      const container = this.$refs.columnContainer;
+      const x = e.touches[0].pageX - container.offsetLeft;
+      const walk = (x - this.startX) * 1.5;
+      container.scrollLeft = this.scrollLeft - walk;
+      this.isScrolling = true;
+      e.preventDefault();
+    },
   },
 };
 </script>
@@ -116,5 +195,26 @@ export default {
   overflow-x: auto;
   min-height: 500px;
   padding: 10px;
+  cursor: grab;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* Improves scrolling on iOS devices */
+
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
 }
 </style>

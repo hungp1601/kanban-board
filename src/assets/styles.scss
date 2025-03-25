@@ -47,6 +47,10 @@ button {
   }
 }
 
+.ck-editor__editable_inline {
+  padding: 0 24px !important;
+}
+
 #kanban-board {
   display: flex;
   gap: 30px;
