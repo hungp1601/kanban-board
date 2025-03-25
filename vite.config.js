@@ -4,6 +4,7 @@ import path from "path";
 
 export default defineConfig({
   plugins: [vue()],
+  base: "/kanban-board/", // Add this line for GitHub Pages deployment
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
