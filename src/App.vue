@@ -79,6 +79,7 @@ import Login from "./components/Login.vue";
 import LoadingSpinner from "./components/LoadingSpinner.vue";
 import AuthService from "./services/AuthService";
 import LanguageSelector from "./components/LanguageSelector.vue";
+import SessionService from "./services/SessionService";
 
 export default {
   name: "App",
@@ -107,6 +108,14 @@ export default {
     };
   },
   created() {
+    // Check for existing session before waiting for Firebase
+    const existingSession = SessionService.getSession();
+    if (existingSession) {
+      this.user = existingSession;
+      // Attempt to load data with session info
+      this.loadData();
+    }
+
     // Listen for auth state changes
     this.unsubscribeAuth = AuthService.onAuthStateChange(async (user) => {
       this.user = user;
@@ -150,10 +159,16 @@ export default {
 
     async logout() {
       try {
+        this.initialLoading = true;
         await AuthService.logout();
+        // Reset application state
+        this.columns = [];
+        this.todos = {};
         // Auth state listener will handle UI update
       } catch (error) {
         console.error("Logout failed:", error);
+      } finally {
+        this.initialLoading = false;
       }
     },
 

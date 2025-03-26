@@ -2,90 +2,101 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
   updateProfile,
-  browserSessionPersistence,
-  setPersistence,
+  onAuthStateChanged,
 } from "firebase/auth";
 import { auth } from "../firebase/config";
+import SessionService from "./SessionService";
 
-class AuthService {
-  constructor() {
-    // Set up persistence to session to avoid issues with persistence across tabs
-    setPersistence(auth, browserSessionPersistence).catch((error) => {
-      console.error("Error setting auth persistence:", error);
-    });
-  }
-
-  // Register a new user
+const AuthService = {
+  /**
+   * Register a new user
+   * @param {string} email - User email
+   * @param {string} password - User password
+   * @param {string} displayName - User display name
+   * @returns {Promise} Firebase user object
+   */
   async register(email, password, displayName) {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      // Update the user profile with display name
-      await updateProfile(userCredential.user, { displayName });
-      return userCredential.user;
-    } catch (error) {
-      console.error("Registration error:", error);
-      throw error;
-    }
-  }
-
-  // Login a user
-  async login(email, password) {
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      return userCredential.user;
-    } catch (error) {
-      console.error("Login error:", error);
-      throw error;
-    }
-  }
-
-  // Logout the current user
-  async logout() {
-    try {
-      await signOut(auth);
-      return true;
-    } catch (error) {
-      console.error("Logout error:", error);
-      throw error;
-    }
-  }
-
-  // Get the current user
-  getCurrentUser() {
-    return auth.currentUser;
-  }
-
-  // Check if user is authenticated
-  isAuthenticated() {
-    return !!auth.currentUser;
-  }
-
-  // Listen to auth state changes with better error handling
-  onAuthStateChange(callback) {
-    return onAuthStateChanged(
+    const userCredential = await createUserWithEmailAndPassword(
       auth,
-      (user) => {
-        try {
-          callback(user);
-        } catch (error) {
-          console.error("Error in auth state change callback:", error);
-        }
-      },
-      (error) => {
-        console.error("Auth state change error:", error);
-      }
+      email,
+      password
     );
-  }
-}
 
-export default new AuthService();
+    if (displayName) {
+      await updateProfile(userCredential.user, { displayName });
+    }
+
+    // Save session data after successful registration
+    SessionService.saveSession(userCredential.user);
+
+    return userCredential.user;
+  },
+
+  /**
+   * Log in an existing user
+   * @param {string} email - User email
+   * @param {string} password - User password
+   * @returns {Promise} Firebase user object
+   */
+  async login(email, password) {
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    // Save session data after successful login
+    SessionService.saveSession(userCredential.user);
+
+    return userCredential.user;
+  },
+
+  /**
+   * Log out the current user
+   * @returns {Promise} Void promise
+   */
+  async logout() {
+    // Clear session data before Firebase logout
+    SessionService.clearSession();
+    return signOut(auth);
+  },
+
+  /**
+   * Set up an auth state change listener
+   * @param {Function} callback - Function to call on auth state change
+   * @returns {Function} Unsubscribe function
+   */
+  onAuthStateChange(callback) {
+    return onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in, update session
+        SessionService.saveSession(user);
+      } else {
+        // User is signed out, clear session
+        SessionService.clearSession();
+      }
+
+      // Call original callback with user object
+      callback(user);
+    });
+  },
+
+  /**
+   * Get current user from session if available
+   * @returns {Object|null} User object or null
+   */
+  getCurrentUser() {
+    return auth.currentUser || SessionService.getSession();
+  },
+
+  /**
+   * Check if user is logged in
+   * @returns {Boolean} True if user is logged in
+   */
+  isLoggedIn() {
+    return !!auth.currentUser || SessionService.hasValidSession();
+  },
+};
+
+export default AuthService;
