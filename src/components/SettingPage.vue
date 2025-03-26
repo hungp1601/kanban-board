@@ -1,62 +1,87 @@
 <template>
   <div class="settings-container">
-    <h2>Board Settings</h2>
+    <h2>{{ $t("settings.title") }}</h2>
 
-    <div class="settings-section">
-      <h3>Column Management</h3>
+    <LoadingSpinner v-if="loading" :message="$t('app.dataLoading')" />
 
-      <draggable
-        v-model="localColumns"
-        group="columns-settings"
-        handle=".drag-handle"
-        item-key="id"
-        :animation="200"
-        class="columns-list"
-        @change="updateColumns"
-      >
-        <template #item="{ element }">
-          <div class="column-item">
-            <div class="column-info">
-              <span class="drag-handle"
-                ><i class="fas fa-grip-vertical"></i
-              ></span>
-              <span class="column-name">{{ element.name }}</span>
+    <div v-else>
+      <div class="settings-section">
+        <h3>{{ $t("settings.language") }}</h3>
+        <div class="language-settings">
+          <p class="language-description">
+            {{ $t("settings.selectLanguage") }}
+          </p>
+          <LanguageSelector />
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>{{ $t("settings.columnManagement") }}</h3>
+
+        <draggable
+          v-model="localColumns"
+          group="columns-settings"
+          handle=".drag-handle"
+          item-key="id"
+          :animation="200"
+          class="columns-list"
+          @change="updateColumns"
+        >
+          <template #item="{ element }">
+            <div class="column-item">
+              <div class="column-info">
+                <span class="drag-handle"
+                  ><i class="fas fa-grip-vertical"></i
+                ></span>
+                <span class="column-name">{{ element.name }}</span>
+              </div>
+              <div class="column-actions">
+                <button @click="editColumn(element.id)">
+                  ✏️ {{ $t("settings.editColumn") }}
+                </button>
+                <button @click="deleteColumn(element.id)" class="delete-btn">
+                  🗑️ {{ $t("settings.deleteColumn") }}
+                </button>
+              </div>
             </div>
-            <div class="column-actions">
-              <button @click="editColumn(element.id)">✏️ Edit</button>
-              <button @click="deleteColumn(element.id)" class="delete-btn">
-                🗑️ Delete
-              </button>
-            </div>
-          </div>
-        </template>
-      </draggable>
+          </template>
+        </draggable>
 
-      <div class="add-column">
-        <input
-          type="text"
-          v-model="newColumnName"
-          placeholder="New column name"
-          @keyup.enter="addNewColumn"
-        />
-        <button @click="addNewColumn" :disabled="!newColumnName.trim()">
-          + Add Column
-        </button>
+        <div class="add-column">
+          <input
+            type="text"
+            v-model="newColumnName"
+            :placeholder="$t('settings.newColumnPlaceholder')"
+            @keyup.enter="addNewColumn"
+          />
+          <button
+            @click="addNewColumn"
+            :disabled="!newColumnName.trim() || loading"
+          >
+            {{ $t("settings.addColumn") }}
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="settings-footer">
-      <button @click="$emit('close')" class="back-btn">Back to Board</button>
+      <button @click="$emit('close')" class="back-btn">
+        {{ $t("app.backToBoard") }}
+      </button>
     </div>
   </div>
 </template>
 
 <script>
 import draggable from "vuedraggable";
+import LoadingSpinner from "./LoadingSpinner.vue";
+import LanguageSelector from "./LanguageSelector.vue";
 
 export default {
   components: {
     draggable,
+    LoadingSpinner,
+    LanguageSelector,
   },
   props: {
     columns: {
@@ -72,6 +97,7 @@ export default {
   data() {
     return {
       newColumnName: "",
+      loading: false,
     };
   },
   computed: {
@@ -95,54 +121,74 @@ export default {
       // The localColumns setter handles the update
     },
 
-    addNewColumn() {
-      if (!this.newColumnName.trim()) return;
+    async addNewColumn() {
+      if (!this.newColumnName.trim() || this.loading) return;
 
-      const newColumn = {
-        id: `column-${Date.now().toString(36)}`,
-        name: this.newColumnName.trim(),
-        order: this.columns.length,
-      };
+      this.loading = true;
 
-      const updatedColumns = [...this.columns, newColumn];
-      this.$emit("update-columns", updatedColumns);
+      try {
+        const newColumn = {
+          id: `column-${Date.now().toString(36)}`,
+          name: this.newColumnName.trim(),
+          order: this.columns.length,
+        };
 
-      // Initialize empty todos array for the new column
-      const updatedTodos = { ...this.todos, [newColumn.id]: [] };
-      this.$emit("update-todos", updatedTodos);
+        const updatedColumns = [...this.columns, newColumn];
+        this.$emit("update-columns", updatedColumns);
 
-      // Reset input
-      this.newColumnName = "";
+        // Initialize empty todos array for the new column
+        const updatedTodos = { ...this.todos, [newColumn.id]: [] };
+        this.$emit("update-todos", updatedTodos);
+
+        // Reset input
+        this.newColumnName = "";
+      } finally {
+        setTimeout(() => {
+          this.loading = false;
+        }, 500);
+      }
     },
 
-    editColumn(columnId) {
+    async editColumn(columnId) {
       const column = this.columns.find((col) => col.id === columnId);
       if (column) {
         const newName = prompt("Enter new column name:", column.name);
         if (newName !== null && newName.trim()) {
-          const updatedColumns = this.columns.map((col) =>
-            col.id === columnId ? { ...col, name: newName.trim() } : col
-          );
-          this.$emit("update-columns", updatedColumns);
+          this.loading = true;
+
+          try {
+            const updatedColumns = this.columns.map((col) =>
+              col.id === columnId ? { ...col, name: newName.trim() } : col
+            );
+            this.$emit("update-columns", updatedColumns);
+          } finally {
+            setTimeout(() => {
+              this.loading = false;
+            }, 500);
+          }
         }
       }
     },
 
-    deleteColumn(columnId) {
-      if (
-        confirm(
-          "Are you sure you want to delete this column? All tasks in this column will be deleted."
-        )
-      ) {
-        const updatedColumns = this.columns
-          .filter((col) => col.id !== columnId)
-          .map((col, idx) => ({ ...col, order: idx }));
+    async deleteColumn(columnId) {
+      if (confirm(this.$t("settings.confirmDeleteColumn"))) {
+        this.loading = true;
 
-        const updatedTodos = { ...this.todos };
-        delete updatedTodos[columnId];
+        try {
+          const updatedColumns = this.columns
+            .filter((col) => col.id !== columnId)
+            .map((col, idx) => ({ ...col, order: idx }));
 
-        this.$emit("update-columns", updatedColumns);
-        this.$emit("update-todos", updatedTodos);
+          const updatedTodos = { ...this.todos };
+          delete updatedTodos[columnId];
+
+          this.$emit("update-columns", updatedColumns);
+          this.$emit("update-todos", updatedTodos);
+        } finally {
+          setTimeout(() => {
+            this.loading = false;
+          }, 500);
+        }
       }
     },
   },
@@ -286,6 +332,15 @@ h2 {
     &:hover {
       background-color: $info-hover;
     }
+  }
+}
+
+.language-settings {
+  margin-bottom: 20px;
+
+  .language-description {
+    margin-bottom: 10px;
+    color: #666;
   }
 }
 </style>

@@ -1,12 +1,14 @@
 <template>
   <div class="modal">
     <div class="modal-content">
-      <span class="close" @click="$emit('close')">&times;</span>
-      <h2>{{ todo.id ? "Edit Todo" : "Add New Todo" }}</h2>
+      <span class="close" @click="closeModal">&times;</span>
+      <h2>{{ todo.id ? $t("todo.edit") : $t("todo.add") }}</h2>
+
+      <LoadingSpinner v-if="saving" overlay :message="$t('todo.saving')" />
 
       <form @submit.prevent="saveTodo">
         <div class="form-group">
-          <label for="todoTitle">Title:</label>
+          <label for="todoTitle">{{ $t("todo.title") }}</label>
           <input
             type="text"
             id="todoTitle"
@@ -16,7 +18,7 @@
         </div>
 
         <div class="form-group">
-          <label for="todoDescription">Description:</label>
+          <label for="todoDescription">{{ $t("todo.description") }}</label>
           <ckeditor
             :editor="editor"
             v-model="localTodo.description"
@@ -25,7 +27,7 @@
         </div>
 
         <div class="form-group">
-          <label>Checklist:</label>
+          <label>{{ $t("todo.checklist") }}</label>
           <div id="checklistContainer">
             <div
               class="checklist-item-container"
@@ -53,12 +55,22 @@
             id="addChecklistItemBtn"
             @click="addChecklistItem"
           >
-            + Add Item
+            {{ $t("todo.addItem") }}
           </button>
         </div>
 
         <div class="form-group">
-          <button type="submit" id="saveBtn">Save</button>
+          <button type="submit" id="saveBtn" :disabled="saving">
+            {{ $t("todo.save") }}
+          </button>
+          <button
+            type="button"
+            class="cancel-btn"
+            @click="closeModal"
+            :disabled="saving"
+          >
+            {{ $t("todo.cancel") }}
+          </button>
         </div>
       </form>
     </div>
@@ -67,9 +79,13 @@
 
 <script>
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
+import LoadingSpinner from "./LoadingSpinner.vue";
 
 export default {
   name: "TodoModal",
+  components: {
+    LoadingSpinner,
+  },
   props: {
     todo: {
       type: Object,
@@ -102,6 +118,7 @@ export default {
         description: "",
         checklist: [],
       },
+      saving: false,
     };
   },
   created() {
@@ -120,19 +137,39 @@ export default {
       this.localTodo.checklist.splice(index, 1);
     },
 
-    saveTodo() {
-      // Remove empty checklist items
-      const checklist = this.localTodo.checklist.filter(
-        (item) => item.text.trim() !== ""
-      );
+    closeModal() {
+      if (!this.saving) {
+        this.$emit("close");
+      }
+    },
 
-      // Create a cleaned todo object
-      const todoToSave = {
-        ...this.localTodo,
-        checklist,
-      };
+    async saveTodo() {
+      this.saving = true;
 
-      this.$emit("save", todoToSave);
+      try {
+        // Remove empty checklist items
+        const checklist = this.localTodo.checklist.filter(
+          (item) => item.text.trim() !== ""
+        );
+
+        // Create a cleaned todo object
+        const todoToSave = {
+          ...this.localTodo,
+          checklist,
+          updatedAt: new Date().toISOString(), // Add timestamp for local tracking
+        };
+
+        this.$emit("save", todoToSave);
+      } catch (error) {
+        console.error("Error preparing todo for save:", error);
+        this.saving = false; // Reset saving state if there's an error
+        alert("Error preparing todo: " + error.message);
+      } finally {
+        // The parent component will close this modal when done
+        setTimeout(() => {
+          this.saving = false;
+        }, 500);
+      }
     },
   },
 };
@@ -140,4 +177,22 @@ export default {
 
 <style lang="scss" scoped>
 // Add scss styles if needed
+.modal-content {
+  position: relative;
+  background-color: white;
+  border-radius: 8px;
+  padding: 25px;
+  width: 80%;
+  max-width: 600px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.cancel-btn {
+  background-color: #6c757d;
+  margin-left: 10px;
+
+  &:hover {
+    background-color: #5a6268;
+  }
+}
 </style>

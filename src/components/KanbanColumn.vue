@@ -38,7 +38,7 @@
         </template>
         <template #footer>
           <div class="empty-column-placeholder" v-if="localTodos.length === 0">
-            Drop tasks here
+            {{ $t("kanban.dropTasksHere") }}
           </div>
           <div class="column-drop-zone-bottom" v-else></div>
         </template>
@@ -88,13 +88,36 @@ export default {
   },
   methods: {
     onDragChange(evt) {
+      // Skip if nothing was added or moved
+      if (!evt.added && !evt.moved) {
+        return;
+      }
+
       // Handle movement between columns
       if (evt.added) {
         const todoId = evt.added.element.id;
         const fromColumnId = evt.added.element.sourceColumn || null;
 
         if (fromColumnId && fromColumnId !== this.column.id) {
+          // Emit the move event with required information
           this.$emit("move-todo", fromColumnId, this.column.id, todoId);
+        } else if (!fromColumnId) {
+          // If no sourceColumn, this might be a new todo or one dragged from a column that wasn't tracked
+          console.warn(
+            `Todo ${todoId} has no source column, setting current column as source`
+          );
+
+          // Update the local todos array with the source information
+          const updatedTodos = [...this.localTodos];
+          const todoIndex = updatedTodos.findIndex((t) => t.id === todoId);
+
+          if (todoIndex !== -1) {
+            updatedTodos[todoIndex] = {
+              ...updatedTodos[todoIndex],
+              sourceColumn: this.column.id,
+            };
+            this.$emit("reorder-todo", this.column.id, updatedTodos);
+          }
         }
       }
 
@@ -108,6 +131,11 @@ export default {
       // Find the todo and set the source column
       const todoIndex = this.localTodos.findIndex((todo) => todo.id === todoId);
       if (todoIndex !== -1) {
+        // Skip if the source column is already set correctly
+        if (this.localTodos[todoIndex].sourceColumn === columnId) {
+          return;
+        }
+
         // Create a new array to avoid direct mutation
         const updatedTodos = [...this.localTodos];
         // Create a new todo object with the source column

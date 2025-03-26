@@ -1,5 +1,11 @@
 <template>
   <main id="kanban-board">
+    <LoadingSpinner
+      v-if="isMovingTodo"
+      overlay
+      :message="$t('kanban.movingTask')"
+    />
+
     <div
       class="kanban-columns-container"
       ref="columnContainer"
@@ -37,11 +43,13 @@
 
 <script>
 import KanbanColumn from "./KanbanColumn.vue";
+import LoadingSpinner from "./LoadingSpinner.vue";
 
 export default {
   name: "KanbanBoard",
   components: {
     KanbanColumn,
+    LoadingSpinner,
   },
   props: {
     columns: {
@@ -60,58 +68,91 @@ export default {
       startX: 0,
       scrollLeft: 0,
       isScrolling: false,
+      isMovingTodo: false,
     };
   },
   methods: {
     moveTodo(fromColumnId, toColumnId, todoId) {
+      if (this.isMovingTodo) return; // Prevent recursive calls
+      this.isMovingTodo = true;
       console.log(
         `Moving todo ${todoId} from ${fromColumnId} to ${toColumnId}`
       );
 
-      if (!this.todos[fromColumnId]) {
-        console.error(`Source column ${fromColumnId} not found`);
-        return;
-      }
+      try {
+        if (!this.todos[fromColumnId]) {
+          throw new Error(`Source column ${fromColumnId} not found`);
+        }
 
-      const fromTodos = [...this.todos[fromColumnId]];
-      const toTodos = [...(this.todos[toColumnId] || [])];
+        // Ensure target column array exists
+        if (!this.todos[toColumnId]) {
+          this.todos = { ...this.todos, [toColumnId]: [] };
+        }
 
-      const todoIndex = fromTodos.findIndex((todo) => todo.id === todoId);
-      if (todoIndex !== -1) {
-        const todo = { ...fromTodos[todoIndex] };
-        fromTodos.splice(todoIndex, 1);
+        const fromTodos = [...this.todos[fromColumnId]];
+        const toTodos = [...(this.todos[toColumnId] || [])];
 
-        // Clean up tracking properties
-        delete todo.sourceColumn;
+        const todoIndex = fromTodos.findIndex((todo) => todo.id === todoId);
+        if (todoIndex !== -1) {
+          const todo = { ...fromTodos[todoIndex] };
+          fromTodos.splice(todoIndex, 1);
 
-        toTodos.push(todo);
+          // Clean up tracking properties
+          delete todo.sourceColumn;
 
-        const updatedTodos = {
-          ...this.todos,
-          [fromColumnId]: fromTodos,
-          [toColumnId]: toTodos,
-        };
+          toTodos.push(todo);
 
-        this.$emit("update-todos", updatedTodos);
-      } else {
-        console.error(`Todo ${todoId} not found in column ${fromColumnId}`);
+          const updatedTodos = {
+            ...this.todos,
+            [fromColumnId]: fromTodos,
+            [toColumnId]: toTodos,
+          };
+
+          // Only emit if the structure actually changed
+          if (JSON.stringify(updatedTodos) !== JSON.stringify(this.todos)) {
+            this.$emit("update-todos", updatedTodos);
+          }
+        } else {
+          throw new Error(`Todo ${todoId} not found in column ${fromColumnId}`);
+        }
+      } catch (error) {
+        console.error(error);
+        // Add user feedback here if needed
+      } finally {
+        // Always clear the moving state after a short delay
+        setTimeout(() => {
+          this.isMovingTodo = false;
+        }, 300);
       }
     },
 
     reorderTodo(columnId, newTodos) {
+      // Skip if the array is empty or identical
+      if (JSON.stringify(newTodos) === JSON.stringify(this.todos[columnId])) {
+        return;
+      }
+
+      // Ensure the column exists in the todos object
+      if (!this.todos[columnId]) {
+        this.todos = { ...this.todos, [columnId]: [] };
+      }
+
       // Process each todo to ensure it has proper structure
       const cleanTodos = newTodos.map((todo) => {
+        // Create a clean copy of the todo
+        const cleanTodo = { ...todo };
+
         // Mark the source column for items coming from other columns
-        if (todo.sourceColumn === undefined && todo._id !== undefined) {
+        if (todo.sourceColumn === undefined && todo.id !== undefined) {
           // Find the original column for this todo
           for (const [colId, todos] of Object.entries(this.todos)) {
             if (colId !== columnId && todos.some((t) => t.id === todo.id)) {
-              todo.sourceColumn = colId;
+              cleanTodo.sourceColumn = colId;
               break;
             }
           }
         }
-        return todo;
+        return cleanTodo;
       });
 
       const updatedTodos = {
@@ -119,7 +160,10 @@ export default {
         [columnId]: cleanTodos,
       };
 
-      this.$emit("update-todos", updatedTodos);
+      // Only emit if the structure actually changed
+      if (JSON.stringify(updatedTodos) !== JSON.stringify(this.todos)) {
+        this.$emit("update-todos", updatedTodos);
+      }
     },
 
     startDrag(e) {
