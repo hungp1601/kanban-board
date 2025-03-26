@@ -91,6 +91,12 @@ export default {
     LoadingSpinner,
     LanguageSelector,
   },
+  props: {
+    initialState: {
+      type: Object,
+      default: null,
+    },
+  },
   data() {
     return {
       storageService: new StorageService(),
@@ -105,9 +111,21 @@ export default {
       loading: false,
       initialLoading: true,
       unsubscribeAuth: null,
+      loadingTimeout: null,
     };
   },
   created() {
+    // Handle initial state if provided from main.js
+    if (this.initialState && this.initialState.user) {
+      this.user = this.initialState.user;
+      this.loadData();
+    }
+
+    // Only show initial loading state for max 3 seconds, then show the auth screen anyway
+    this.loadingTimeout = setTimeout(() => {
+      this.initialLoading = false;
+    }, 3000);
+
     // Check for existing session before waiting for Firebase
     const existingSession = SessionService.getSession();
     if (existingSession) {
@@ -120,6 +138,12 @@ export default {
     this.unsubscribeAuth = AuthService.onAuthStateChange(async (user) => {
       this.user = user;
 
+      // Clear the loading timeout since we got a response
+      if (this.loadingTimeout) {
+        clearTimeout(this.loadingTimeout);
+        this.loadingTimeout = null;
+      }
+
       if (user) {
         await this.loadData();
       }
@@ -128,18 +152,31 @@ export default {
     });
   },
   beforeUnmount() {
-    // Clean up auth listener
+    // Clean up auth listener and any pending timeouts
     if (this.unsubscribeAuth) {
       this.unsubscribeAuth();
+    }
+    if (this.loadingTimeout) {
+      clearTimeout(this.loadingTimeout);
     }
   },
   methods: {
     async loadData() {
-      this.loading = true;
+      // this.loading = true;
+
+      // Set a timeout to clear the loading state after 5 seconds
+      // even if the data loading fails
+      const loadingTimeout = setTimeout(() => {
+        // this.loading = false;
+        console.warn("Data loading timeout reached, continuing with app");
+      }, 5000);
+
       try {
-        // Correctly use the storageService to fetch data
-        const columnsData = await this.storageService.getColumns();
-        const todosData = await this.storageService.getTodos();
+        // Use Promise.all for parallel loading to improve speed
+        const [columnsData, todosData] = await Promise.all([
+          this.storageService.getColumns(),
+          this.storageService.getTodos(),
+        ]);
 
         // Set data only after both promises have resolved
         this.columns = columnsData;
@@ -149,6 +186,7 @@ export default {
         // Show error message to user
         alert("Error loading data: " + error.message);
       } finally {
+        clearTimeout(loadingTimeout);
         this.loading = false;
       }
     },
@@ -173,7 +211,13 @@ export default {
     },
 
     async updateColumns(newColumns) {
-      this.loading = true;
+      // this.loading = true;
+
+      // Set a timeout to clear the loading state after 3 seconds
+      const loadingTimeout = setTimeout(() => {
+        // this.loading = false;
+      }, 3000);
+
       try {
         await this.storageService.saveColumns(newColumns);
         this.columns = newColumns;
@@ -194,14 +238,21 @@ export default {
       } catch (error) {
         console.error("Failed to update columns:", error);
       } finally {
-        this.loading = false;
+        clearTimeout(loadingTimeout);
+        // this.loading = false;
       }
     },
 
     async updateTodos(newTodos) {
       if (this.loading) return; // Prevent recursive calls when already loading
 
-      this.loading = true;
+      // this.loading = true;
+
+      // Set a timeout to clear the loading state after 3 seconds
+      const loadingTimeout = setTimeout(() => {
+        // this.loading = false;
+      }, 3000);
+
       try {
         // Ensure all columns exist in the todos object
         const ensuredTodos = { ...newTodos };
@@ -217,7 +268,8 @@ export default {
       } catch (error) {
         console.error("Failed to update todos:", error);
       } finally {
-        this.loading = false;
+        clearTimeout(loadingTimeout);
+        // this.loading = false;
       }
     },
 
@@ -249,7 +301,7 @@ export default {
     },
 
     async saveTodo(todo) {
-      this.loading = true;
+      // this.loading = true;
 
       try {
         if (this.isEditing && this.currentColumnId) {
@@ -284,13 +336,13 @@ export default {
         console.error("Failed to save todo:", error);
         alert("Failed to save todo: " + error.message);
       } finally {
-        this.loading = false;
+        // this.loading = false;
       }
     },
 
     async deleteTodo(columnId, todoId) {
       if (confirm(this.$t("todo.confirmDelete"))) {
-        this.loading = true;
+        // this.loading = true;
 
         try {
           const columnTodos = this.todos[columnId].filter(
@@ -302,13 +354,13 @@ export default {
         } catch (error) {
           console.error("Failed to delete todo:", error);
         } finally {
-          this.loading = false;
+          // this.loading = false;
         }
       }
     },
 
     async updateChecklistItem(columnId, todoId, itemIndex, isCompleted) {
-      this.loading = true;
+      // this.loading = true;
 
       try {
         const columnTodos = [...this.todos[columnId]];
@@ -326,7 +378,7 @@ export default {
       } catch (error) {
         console.error("Failed to update checklist item:", error);
       } finally {
-        this.loading = false;
+        // this.loading = false;
       }
     },
 

@@ -16,13 +16,30 @@ class StorageService {
     this.COLUMNS_COLLECTION = "kanban-columns";
     this.TODOS_COLLECTION = "kanban-todos";
     this.cachedColumns = null;
+    this.cachedTodos = null; // Add caching for todos
+    this.cacheExpiration = 60000; // Cache valid for 1 minute
+    this.lastCacheTime = 0;
   }
 
   // Get the current user ID or throw if no user is logged in
   getCurrentUserId() {
     const user = auth.currentUser;
-    if (!user) throw new Error("No authenticated user");
+    // Also check the session service as a fallback
+    if (!user) {
+      const sessionUser = JSON.parse(
+        localStorage.getItem("kanban-auth-session")
+      );
+      if (sessionUser && sessionUser.uid) {
+        return sessionUser.uid;
+      }
+      throw new Error("No authenticated user");
+    }
     return user.uid;
+  }
+
+  // Check if cache is still valid
+  isCacheValid() {
+    return Date.now() - this.lastCacheTime < this.cacheExpiration;
   }
 
   // Initialize default columns if not exist
@@ -30,7 +47,17 @@ class StorageService {
     try {
       const userId = this.getCurrentUserId();
       const userColumnsRef = doc(db, this.COLUMNS_COLLECTION, userId);
-      const userColumnsSnap = await getDoc(userColumnsRef);
+
+      // Add timeout to Firebase operations
+      const docPromise = getDoc(userColumnsRef);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Firebase operation timed out")),
+          3000
+        )
+      );
+
+      const userColumnsSnap = await Promise.race([docPromise, timeoutPromise]);
 
       if (!userColumnsSnap.exists()) {
         const defaultColumns = [
@@ -47,29 +74,47 @@ class StorageService {
         });
 
         this.cachedColumns = defaultColumns;
+        this.lastCacheTime = Date.now();
         return defaultColumns;
       }
 
       const columns = userColumnsSnap.data().columns;
       this.cachedColumns = columns;
+      this.lastCacheTime = Date.now();
       return columns;
     } catch (error) {
       console.error("Error initializing columns:", error);
-      throw error;
+      // Return default columns as a fallback if Firebase fails
+      const defaultColumns = [
+        { id: "new", name: "New", order: 0 },
+        { id: "todo", name: "To Do", order: 1 },
+        { id: "done", name: "Done", order: 2 },
+      ];
+      return defaultColumns;
     }
   }
 
   // Get all columns
   async getColumns() {
     try {
-      // Return cached columns if available to reduce Firebase reads
-      if (this.cachedColumns) {
+      // Return cached columns if available and still valid to reduce Firebase reads
+      if (this.cachedColumns && this.isCacheValid()) {
         return [...this.cachedColumns].sort((a, b) => a.order - b.order);
       }
 
       const userId = this.getCurrentUserId();
       const userColumnsRef = doc(db, this.COLUMNS_COLLECTION, userId);
-      const userColumnsSnap = await getDoc(userColumnsRef);
+
+      // Add timeout to Firebase operations
+      const docPromise = getDoc(userColumnsRef);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Firebase operation timed out")),
+          3000
+        )
+      );
+
+      const userColumnsSnap = await Promise.race([docPromise, timeoutPromise]);
 
       if (!userColumnsSnap.exists()) {
         return await this.initializeColumns();
@@ -77,10 +122,16 @@ class StorageService {
 
       const columns = userColumnsSnap.data().columns;
       this.cachedColumns = columns;
+      this.lastCacheTime = Date.now();
       return [...columns].sort((a, b) => a.order - b.order);
     } catch (error) {
       console.error("Error getting columns:", error);
-      throw error;
+      // If we have cached columns, return them as fallback even if expired
+      if (this.cachedColumns) {
+        return [...this.cachedColumns].sort((a, b) => a.order - b.order);
+      }
+      // Otherwise try to initialize with defaults
+      return this.initializeColumns();
     }
   }
 
@@ -102,6 +153,7 @@ class StorageService {
 
       // Update cache
       this.cachedColumns = columns;
+      this.lastCacheTime = Date.now();
       return true;
     } catch (error) {
       console.error("Error saving columns:", error);
@@ -112,9 +164,24 @@ class StorageService {
   // Get all todos
   async getTodos() {
     try {
+      // Return cached todos if available and still valid
+      if (this.cachedTodos && this.isCacheValid()) {
+        return { ...this.cachedTodos };
+      }
+
       const userId = this.getCurrentUserId();
       const userTodosRef = doc(db, this.TODOS_COLLECTION, userId);
-      const userTodosSnap = await getDoc(userTodosRef);
+
+      // Add timeout to Firebase operations
+      const docPromise = getDoc(userTodosRef);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Firebase operation timed out")),
+          3000
+        )
+      );
+
+      const userTodosSnap = await Promise.race([docPromise, timeoutPromise]);
 
       // Get all columns to initialize the todos structure
       const columns = await this.getColumns();
@@ -130,6 +197,8 @@ class StorageService {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        this.cachedTodos = defaultTodos;
+        this.lastCacheTime = Date.now();
         return defaultTodos;
       }
 
@@ -142,10 +211,24 @@ class StorageService {
         }
       });
 
+      this.cachedTodos = todos;
+      this.lastCacheTime = Date.now();
       return todos;
     } catch (error) {
       console.error("Error getting todos:", error);
-      throw error;
+
+      // If we have cached todos, use them as fallback even if expired
+      if (this.cachedTodos) {
+        return { ...this.cachedTodos };
+      }
+
+      // Otherwise create empty structure based on columns
+      const columns = await this.getColumns();
+      const defaultTodos = {};
+      columns.forEach((column) => {
+        defaultTodos[column.id] = [];
+      });
+      return defaultTodos;
     }
   }
 
@@ -154,6 +237,10 @@ class StorageService {
     try {
       const userId = this.getCurrentUserId();
       const userTodosRef = doc(db, this.TODOS_COLLECTION, userId);
+
+      // Update cache immediately for instant UI feedback
+      this.cachedTodos = todos;
+      this.lastCacheTime = Date.now();
 
       // Update with timestamp
       await setDoc(

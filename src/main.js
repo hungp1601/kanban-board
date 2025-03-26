@@ -13,26 +13,26 @@ let authInitialized = false;
 // Check for existing session before auth initialization
 const existingSession = SessionService.getSession();
 
-// Add a timeout to avoid hanging forever if Firebase auth is slow
+// Reduce timeout from 5000ms to 2000ms for faster app initialization
 const authTimeout = setTimeout(() => {
   if (!authInitialized) {
     console.warn("Firebase auth initialization timed out, creating app anyway");
-    initializeApp();
+    initializeApp(existingSession ? { user: existingSession } : null);
   }
-}, 5000); // 5 seconds timeout
+}, 2000); // Reduced to 2 seconds timeout
 
 // Wait for Firebase Auth to initialize before creating the app
 auth.onAuthStateChanged((firebaseUser) => {
   clearTimeout(authTimeout);
   if (!authInitialized) {
     authInitialized = true;
-    initializeApp();
+    initializeApp({ user: firebaseUser });
   }
 });
 
-function initializeApp() {
+function initializeApp(initialState = null) {
   if (!app) {
-    app = createApp(App);
+    app = createApp(App, { initialState });
     app.use(CKEditor);
     app.use(i18n);
 
@@ -42,3 +42,11 @@ function initializeApp() {
     app.mount("#app");
   }
 }
+
+// Initialize after a max delay if Firebase is unresponsive
+setTimeout(() => {
+  if (!app) {
+    console.error("Application initialization failed, forcing startup");
+    initializeApp();
+  }
+}, 3000);

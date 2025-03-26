@@ -165,10 +165,10 @@ export default {
         this.saving = false; // Reset saving state if there's an error
         alert("Error preparing todo: " + error.message);
       } finally {
-        // The parent component will close this modal when done
+        // Reduce timeout from 500ms to 100ms
         setTimeout(() => {
           this.saving = false;
-        }, 500);
+        }, 100);
       }
     },
   },

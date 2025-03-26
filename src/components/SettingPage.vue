@@ -143,9 +143,10 @@ export default {
         // Reset input
         this.newColumnName = "";
       } finally {
+        // Reduce timeout from 500ms to 100ms
         setTimeout(() => {
           this.loading = false;
-        }, 500);
+        }, 100);
       }
     },
 
@@ -162,9 +163,10 @@ export default {
             );
             this.$emit("update-columns", updatedColumns);
           } finally {
+            // Reduce timeout from 500ms to 100ms
             setTimeout(() => {
               this.loading = false;
-            }, 500);
+            }, 100);
           }
         }
       }
@@ -185,9 +187,10 @@ export default {
           this.$emit("update-columns", updatedColumns);
           this.$emit("update-todos", updatedTodos);
         } finally {
+          // Reduce timeout from 500ms to 100ms
           setTimeout(() => {
             this.loading = false;
-          }, 500);
+          }, 100);
         }
       }
     },

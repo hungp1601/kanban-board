@@ -119,10 +119,10 @@ export default {
         console.error(error);
         // Add user feedback here if needed
       } finally {
-        // Always clear the moving state after a short delay
+        // Reduce timeout from 300ms to 100ms
         setTimeout(() => {
           this.isMovingTodo = false;
-        }, 300);
+        }, 100);
       }
     },
 
@@ -197,10 +197,10 @@ export default {
       container.style.cursor = "grab";
       container.style.removeProperty("user-select");
 
-      // Prevent click events immediately after scrolling
+      // Reduce timeout from 100ms to 50ms for more responsive feel
       setTimeout(() => {
         this.isScrolling = false;
-      }, 100);
+      }, 50);
     },
 
     startTouchDrag(e) {
