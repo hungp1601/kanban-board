@@ -33,9 +33,9 @@
             @set-source-column="setSourceColumn"
           />
         </template>
-        <template #header>
+        <!-- <template #header>
           <div class="column-drop-zone-top" v-if="localTodos.length > 0"></div>
-        </template>
+        </template> -->
         <template #footer>
           <div class="empty-column-placeholder" v-if="localTodos.length === 0">
             {{ $t("kanban.dropTasksHere") }}
